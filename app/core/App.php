@@ -1,6 +1,4 @@
 <?php
-// filepath: /c:/xampp/htdocs/php_api/app/core/App.php
-
 
 require_once __DIR__ . '/../controllers/StudentController.php';
 
@@ -52,13 +50,16 @@ class App {
             error_log("Checking Route: " . $route . " with pattern: " . $pattern);
 
             if (preg_match($pattern, $requestUri, $matches)) {
-                array_shift($matches); // Remove full match
+                error_log("Match found: " . json_encode($matches));
+
+                // Remove numeric index matches, keep named parameters
+                $matches = array_filter($matches, 'is_string', ARRAY_FILTER_USE_KEY);
 
                 if ($requestMethod === 'POST' || $requestMethod === 'PUT') {
                     $requestData = $this->getRequestData();
-                    $this->dispatch($handler, array_merge([$requestData], $matches));
+                    $this->dispatch($handler, array_merge([$requestData], array_values($matches)));
                 } else {
-                    $this->dispatch($handler, $matches);
+                    $this->dispatch($handler, array_values($matches));
                 }
                 return;
             }
@@ -75,22 +76,27 @@ class App {
 
     private function convertToRegex(string $route): string {
         error_log("Converting Route: " . $route);
-        $pattern = preg_replace('/\{(\w+)\}/', '(\d+)', $route);
+        $pattern = preg_replace('/\{(\w+)\}/', '(?P<\1>\d+)', $route); // Named capture groups
         $pattern = '/^' . str_replace('/', '\/', $pattern) . '$/';
         error_log("Generated Regex: " . $pattern);
         return $pattern;
     }
-    
 
     private function getRequestData() {
         $data = json_decode(file_get_contents('php://input'), true);
-        return is_array($data) ? $data : []; // Ensure it's an array
+        return is_array($data) ? $data : []; // Ensure it is an array
     }
 
     private function dispatch(array $handler, array $params) {
         [$controllerClass, $method] = $handler;
         $controller = new $controllerClass();
-        call_user_func_array([$controller, $method], $params);
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' || $_SERVER['REQUEST_METHOD'] === 'PUT') {
+            $requestData = array_shift($params);
+            call_user_func_array([$controller, $method], array_merge([$requestData], $params));
+        } else {
+            call_user_func_array([$controller, $method], $params);
+        }
     }
 
     private function sendNotFound() {
