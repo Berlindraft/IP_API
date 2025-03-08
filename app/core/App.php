@@ -52,7 +52,6 @@ class App {
             if (preg_match($pattern, $requestUri, $matches)) {
                 error_log("Match found: " . json_encode($matches));
 
-                // Remove numeric index matches, keep named parameters
                 $matches = array_filter($matches, 'is_string', ARRAY_FILTER_USE_KEY);
 
                 if ($requestMethod === 'POST' || $requestMethod === 'PUT') {
@@ -76,7 +75,7 @@ class App {
 
     private function convertToRegex(string $route): string {
         error_log("Converting Route: " . $route);
-        $pattern = preg_replace('/\{(\w+)\}/', '(?P<\1>\d+)', $route); // Named capture groups
+        $pattern = preg_replace('/\{(\w+)\}/', '(?P<\1>\d+)', $route); 
         $pattern = '/^' . str_replace('/', '\/', $pattern) . '$/';
         error_log("Generated Regex: " . $pattern);
         return $pattern;
@@ -84,7 +83,7 @@ class App {
 
     private function getRequestData() {
         $data = json_decode(file_get_contents('php://input'), true);
-        return is_array($data) ? $data : []; // Ensure it is an array
+        return is_array($data) ? $data : []; 
     }
 
     private function dispatch(array $handler, array $params) {

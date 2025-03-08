@@ -1,11 +1,11 @@
 <?php
-require_once __DIR__ . '/../repositories/StudentRepository.php';
+require_once __DIR__ . '/../service/StudentService.php';
 
 class StudentController {
-    private $studentRepository;
+    private $studentService;
 
     public function __construct() {
-        $this->studentRepository = new StudentRepository();
+        $this->studentService = new StudentService();
     }
 
     public function addStudent($data) {
@@ -13,78 +13,45 @@ class StudentController {
             echo json_encode(["error" => "Invalid input"]);
             return;
         }
-        $finalGrade = $this->calculateFinalGrade($data['midterm'], $data['final']);
-        $result = $this->studentRepository->addStudent($data['name'], $data['midterm'], $data['final'], $finalGrade);
-        if ($result) {
-            echo json_encode(["message" => "Student added successfully"]);
-        } else {
-            echo json_encode(["error" => "Failed to add student"]);
-        }
+
+        $result = $this->studentService->addStudent($data['name'], $data['midterm'], $data['final']);
+        echo json_encode($result ? ["message" => "Student added successfully"] : ["error" => "Failed to add student"]);
     }
 
     public function updateStudent($data, $id) {
         if (!is_numeric($id)) {
-            echo json_encode(["error" => "Student ID is required and must be a number"]);
+            echo json_encode(["error" => "Student ID must be a number"]);
             return;
         }
 
-        $student = $this->studentRepository->getStudent($id);
-        if (!$student) {
-            echo json_encode(["error" => "Student not found"]);
-            return;
-        }
-
-        $midterm = isset($data['midterm']) ? (float)$data['midterm'] : (float)$student['st_midterm'];
-        $final = isset($data['final']) ? (float)$data['final'] : (float)$student['st_final'];
-        $finalGrade = $this->calculateFinalGrade($midterm, $final);
-
-        $entity = [
-            'id' => $id,
-            'midterm' => $midterm,
-            'final' => $final,
-            'finalGrade' => $finalGrade
-        ];
-
-        try {
-            $this->studentRepository->updateStudentRecord($entity);
-            echo json_encode(["message" => "Student updated successfully"]);
-        } catch (Exception $e) {
-            echo json_encode(["error" => $e->getMessage()]);
-        }
+        $result = $this->studentService->updateStudent($id, $data);
+        echo json_encode($result ? ["message" => "Student updated successfully"] : ["error" => "Failed to update student"]);
     }
 
     public function getAllStudents() {
-        $students = $this->studentRepository->getAllStudents();
-        foreach ($students as &$student) {
-            $student['status'] = $this->getPassFailStatus($student['st_final']);
-        }
-        echo json_encode($students);
+        echo json_encode($this->studentService->getAllStudents());
     }
 
     public function getStudent($id) {
-        $student = $this->studentRepository->getStudent($id);
-        if ($student) {
-            $student['status'] = $this->getPassFailStatus($student['st_final']);
-            echo json_encode($student);
-        } else {
-            echo json_encode(["error" => "Student not found"]);
-        }
+        $student = $this->studentService->getStudent($id);
+        echo json_encode($student ? $student : ["error" => "Student not found"]);
     }
 
     public function deleteStudent($id) {
-        $result = $this->studentRepository->deleteStudent($id);
-        if ($result) {
-            echo json_encode(["message" => "Student deleted successfully"]);
-        } else {
-            echo json_encode(["error" => "Failed to delete student"]);
+        if (!is_numeric($id)) {
+            echo json_encode(["error" => "Student ID must be a number"]);
+            return;
         }
+
+        $result = $this->studentService->deleteStudent($id);
+        echo json_encode($result ? ["message" => "Student deleted successfully"] : ["error" => "Failed to delete student"]);
     }
 
     public function getFinalGradeById($id) {
-        $student = $this->studentRepository->getStudent($id);
+        $student = $this->studentService->getStudent($id);
         if ($student) {
-            $finalGrade = $student['st_final'];
-            $status = $this->getPassFailStatus($finalGrade);
+            $finalGrade = $this->studentService->calculateFinalGrade($student['st_midterm'], $student['st_final']);
+            $status = $this->studentService->getPassFailStatus($finalGrade);
             echo json_encode(["final_grade" => $finalGrade, "status" => $status]);
         } else {
             echo json_encode(["error" => "Student not found"]);
@@ -92,25 +59,17 @@ class StudentController {
     }
 
     public function getAllFinalGrades() {
-        $students = $this->studentRepository->getAllStudents();
+        $students = $this->studentService->getAllStudents();
         $finalGrades = [];
         foreach ($students as $student) {
             $finalGrades[] = [
                 "id" => $student['st_id'],
                 "name" => $student['st_name'],
-                "final_grade" => $student['st_final'],
-                "status" => $this->getPassFailStatus($student['st_final'])
+                "final_grade" => $student['finalGrade'],
+                "status" => $student['status']
             ];
         }
         echo json_encode($finalGrades);
-    }
-
-    private function getPassFailStatus($finalGrade) {
-        return $finalGrade >= 75 ? 'Pass' : 'Fail';
-    }
-
-    private function calculateFinalGrade($midterm, $final) {
-        return (0.4 * $midterm) + (0.6 * $final);
     }
 }
 ?>
